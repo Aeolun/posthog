@@ -124,6 +124,9 @@ $TLS_BLOCK
 }
 $DOMAIN, http://, https:// {
 encode gzip zstd
+handle_path /livestream/* {
+reverse_proxy http://livestream:8080
+}
 reverse_proxy http://web:8000
 }
 EOF
@@ -211,7 +214,7 @@ cp posthog/docker-compose.base.yml docker-compose.base.yml
 cp posthog/docker-compose.hobby.yml docker-compose.yml.tmpl
 envsubst < docker-compose.yml.tmpl > docker-compose.yml
 rm docker-compose.yml.tmpl
-echo "Starting the stack!" 
+echo "Starting the stack!"
 sudo -E docker-compose -f docker-compose.yml up -d
 
 echo "We will need to wait ~5-10 minutes for things to settle down, migrations to finish, and TLS certs to be issued"

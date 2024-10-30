@@ -61,7 +61,7 @@ export const liveEventsTableLogic = kea<liveEventsTableLogicType>([
     listeners(({ actions, values }) => ({
         pollStats: async () => {
             try {
-                if (!values.currentTeam) {
+                if (!values.currentTeam || !values.currentTeam.live_events_token) {
                     return
                 }
 
