@@ -17,7 +17,6 @@ from psycopg import sql
 from retry import retry
 from sentry_sdk import capture_exception
 
-from ee.clickhouse.materialized_columns.columns import get_materialized_columns
 from posthog import version_requirement
 from posthog.clickhouse.client.connection import Workload
 from posthog.client import sync_execute
@@ -459,6 +458,29 @@ def get_teams_with_event_count_with_groups_in_period(begin: datetime, end: datet
 @timed_log()
 @retry(tries=QUERY_RETRIES, delay=QUERY_RETRY_DELAY, backoff=QUERY_RETRY_BACKOFF)
 def get_all_event_metrics_in_period(begin: datetime, end: datetime) -> dict[str, list[tuple[int, int]]]:
+    metrics: dict[str, list[tuple[int, int]]] = {
+        "helicone_events": [],
+        "langfuse_events": [],
+        "keywords_ai_events": [],
+        "traceloop_events": [],
+        "web_events": [],
+        "node_events": [],
+        "android_events": [],
+        "flutter_events": [],
+        "ios_events": [],
+        "go_events": [],
+        "java_events": [],
+        "react_native_events": [],
+        "ruby_events": [],
+        "python_events": [],
+        "php_events": [],
+    }
+
+    if not settings.EE_AVAILABLE:
+        return metrics
+
+    from ee.clickhouse.materialized_columns.columns import get_materialized_columns
+
     materialized_columns = get_materialized_columns("events")
 
     # Check if $lib is materialized
@@ -496,24 +518,6 @@ def get_all_event_metrics_in_period(begin: datetime, end: datetime) -> dict[str,
         workload=Workload.OFFLINE,
         settings=CH_BILLING_SETTINGS,
     )
-
-    metrics: dict[str, list[tuple[int, int]]] = {
-        "helicone_events": [],
-        "langfuse_events": [],
-        "keywords_ai_events": [],
-        "traceloop_events": [],
-        "web_events": [],
-        "node_events": [],
-        "android_events": [],
-        "flutter_events": [],
-        "ios_events": [],
-        "go_events": [],
-        "java_events": [],
-        "react_native_events": [],
-        "ruby_events": [],
-        "python_events": [],
-        "php_events": [],
-    }
 
     for team_id, metric, count in results:
         metrics[metric].append((team_id, count))

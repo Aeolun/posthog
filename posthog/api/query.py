@@ -2,6 +2,7 @@ import re
 import uuid
 
 from django.http import JsonResponse, StreamingHttpResponse
+from django.conf import settings
 from drf_spectacular.utils import OpenApiResponse
 from pydantic import BaseModel
 from rest_framework import status, viewsets
@@ -11,8 +12,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from sentry_sdk import capture_exception, set_tag
 
-from ee.hogai.assistant import Assistant
-from ee.hogai.utils import Conversation
 from posthog.api.documentation import extend_schema
 from posthog.api.mixins import PydanticModelMixin
 from posthog.api.monitoring import Feature, monitor
@@ -177,6 +176,12 @@ class QueryViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.ViewSet)
 
     @action(detail=False, methods=["POST"], renderer_classes=[ServerSentEventRenderer])
     def chat(self, request: Request, *args, **kwargs):
+        if not settings.EE_AVAILABLE:
+            return
+
+        from ee.hogai.assistant import Assistant
+        from ee.hogai.utils import Conversation
+
         assert request.user is not None
         validated_body = Conversation.model_validate(request.data)
         assistant = Assistant(self.team)

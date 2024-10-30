@@ -22,9 +22,10 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.utils.encoders import JSONEncoder
 
-from ee.session_recordings.ai.error_clustering import error_clustering
-from ee.session_recordings.ai.similar_recordings import similar_recordings
-from ee.session_recordings.session_summary.summarize_session import summarize_recording
+if settings.EE_AVAILABLE:
+    from ee.session_recordings.ai.error_clustering import error_clustering
+    from ee.session_recordings.ai.similar_recordings import similar_recordings
+    from ee.session_recordings.session_summary.summarize_session import summarize_recording
 from posthog.api.person import MinimalPersonSerializer
 from posthog.api.routing import TeamAndOrgViewSetMixin
 from posthog.api.utils import action, safe_clickhouse_string

@@ -10,11 +10,13 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.clickhouse_driver import ClickhouseDriverIntegration
+from sentry_sdk.integrations.openai import OpenAIIntegration
 from posthog.git import get_git_commit_full
 
 from posthog.settings import get_from_env
 from posthog.settings.base_variables import TEST
 
+logger = logging.getLogger(__name__)
 
 def before_send(event, hint):
     for exception in event.get("exception", {}).get("values", []):
@@ -141,7 +143,8 @@ def traces_sampler(sampling_context: dict) -> float:
 
 
 def sentry_init() -> None:
-    if not TEST and os.getenv("SENTRY_DSN"):
+    sentry_dsn = os.getenv("SENTRY_DSN")
+    if not TEST and sentry_dsn and not sentry_dsn.startswith("https://public@sentry.example.com"):
         # Setting this on enables more visibility, at the risk of capturing personal information we should not:
         #   - standard sentry "client IP" field, through send_default_pii
         #   - django access logs (info level)
@@ -154,29 +157,36 @@ def sentry_init() -> None:
 
         release = get_git_commit_full()
 
-        sentry_sdk.init(
-            send_default_pii=send_pii,
-            dsn=os.environ["SENTRY_DSN"],
-            release=release,
-            integrations=[
-                DjangoIntegration(),
-                CeleryIntegration(),
-                RedisIntegration(),
-                ClickhouseDriverIntegration(),
-                LoggingIntegration(level=sentry_logging_level, event_level=None),
-            ],
-            max_request_body_size="always" if send_pii else "never",
-            max_value_length=8192,  # Increased from the default of 1024 to capture SQL statements in full
-            sample_rate=1.0,  # Sampling rate of errors
-            traces_sampler=traces_sampler,
-            before_send=before_send,
-            before_send_transaction=before_send_transaction,
-            _experiments={
-                # https://docs.sentry.io/platforms/python/profiling/
-                # The profiles_sample_rate setting is relative to the traces_sample_rate setting.
-                "profiles_sample_rate": profiles_sample_rate,
-            },
-        )
+        try:
+            sentry_sdk.init(
+                send_default_pii=send_pii,
+                dsn=os.environ["SENTRY_DSN"],
+                release=release,
+                integrations=[
+                    DjangoIntegration(),
+                    CeleryIntegration(),
+                    RedisIntegration(),
+                    ClickhouseDriverIntegration(),
+                    LoggingIntegration(level=sentry_logging_level, event_level=None),
+                ],
+                disabled_integrations=[
+                    # Prevents the service from starting :?
+                    OpenAIIntegration(),
+                ],
+                max_request_body_size="always" if send_pii else "never",
+                max_value_length=8192,  # Increased from the default of 1024 to capture SQL statements in full
+                sample_rate=1.0,  # Sampling rate of errors
+                traces_sampler=traces_sampler,
+                before_send=before_send,
+                before_send_transaction=before_send_transaction,
+                _experiments={
+                    # https://docs.sentry.io/platforms/python/profiling/
+                    # The profiles_sample_rate setting is relative to the traces_sample_rate setting.
+                    "profiles_sample_rate": profiles_sample_rate,
+                },
+            )
+        except:
+            logger.warning("Could not initialize sentry configuration.")
 
 
 sentry_init()

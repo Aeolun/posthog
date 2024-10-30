@@ -1,5 +1,6 @@
 from typing import Any, Optional, cast
 
+from django.conf import settings
 import posthoganalytics
 from rest_framework import (
     exceptions,
@@ -10,8 +11,6 @@ from rest_framework import (
     status,
     viewsets,
 )
-
-from ee.models.explicit_team_membership import ExplicitTeamMembership
 from posthog.api.routing import TeamAndOrgViewSetMixin
 from posthog.api.shared import UserBasicSerializer
 from posthog.api.utils import action
@@ -62,6 +61,10 @@ class OrganizationInviteSerializer(serializers.ModelSerializer):
         team_error = "Project does not exist on this organization, or it is private and you do not have access to it."
         if not private_project_access:
             return None
+
+        if not settings.EE_AVAILABLE:
+            return private_project_access
+
         for item in private_project_access:
             # if the project is private, if user is not an admin of the team, they can't invite to it
             organization: Organization = Organization.objects.get(id=self.context["organization_id"])
@@ -78,26 +81,30 @@ class OrganizationInviteSerializer(serializers.ModelSerializer):
             if not is_private:
                 continue
             try:
-                team_membership: ExplicitTeamMembership | OrganizationMembership = ExplicitTeamMembership.objects.get(
-                    team_id=item["id"],
-                    parent_membership__user=self.context["request"].user,
-                )
-            except ExplicitTeamMembership.DoesNotExist:
+                from ee.models.explicit_team_membership import ExplicitTeamMembership
                 try:
-                    # No explicit team membership. Try getting the implicit team membership - any org owners and admins can invite to any team
-                    team_membership = OrganizationMembership.objects.get(
-                        organization_id=self.context["organization_id"],
-                        user=self.context["request"].user,
-                        level__in=[OrganizationMembership.Level.ADMIN, OrganizationMembership.Level.OWNER],
+                    team_membership: ExplicitTeamMembership | OrganizationMembership = ExplicitTeamMembership.objects.get(
+                        team_id=item["id"],
+                        parent_membership__user=self.context["request"].user,
                     )
-                except OrganizationMembership.DoesNotExist:
+                except ExplicitTeamMembership.DoesNotExist:
+                    try:
+                        # No explicit team membership. Try getting the implicit team membership - any org owners and admins can invite to any team
+                        team_membership = OrganizationMembership.objects.get(
+                            organization_id=self.context["organization_id"],
+                            user=self.context["request"].user,
+                            level__in=[OrganizationMembership.Level.ADMIN, OrganizationMembership.Level.OWNER],
+                        )
+                    except OrganizationMembership.DoesNotExist:
+                        raise exceptions.ValidationError(
+                            team_error,
+                        )
+                if team_membership.level < item["level"]:
                     raise exceptions.ValidationError(
-                        team_error,
+                        "You cannot invite to a private project with a higher level than your own.",
                     )
-            if team_membership.level < item["level"]:
-                raise exceptions.ValidationError(
-                    "You cannot invite to a private project with a higher level than your own.",
-                )
+            except:
+                continue
 
         return private_project_access
 

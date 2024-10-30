@@ -486,7 +486,7 @@ class Team(UUIDClassicModel):
         create_data_for_demo_team.delay(self.id, initiating_user.id, cache_key)
 
     def all_users_with_access(self) -> QuerySet["User"]:
-        from ee.models.explicit_team_membership import ExplicitTeamMembership
+
         from posthog.models.organization import OrganizationMembership
         from posthog.models.user import User
 
@@ -495,6 +495,7 @@ class Team(UUIDClassicModel):
                 "user_id", flat=True
             )
         else:
+            from ee.models.explicit_team_membership import ExplicitTeamMembership
             user_ids_queryset = (
                 OrganizationMembership.objects.filter(
                     organization_id=self.organization_id, level__gte=OrganizationMembership.Level.ADMIN

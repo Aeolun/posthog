@@ -7,7 +7,7 @@
 #   as base image the container image from the previous step. The image is
 #   then pushed to AWS ECR.
 #
-name: Container Images CD
+name: Container Images CD OSS
 
 on:
     push:
@@ -23,7 +23,7 @@ env:
 
 jobs:
     posthog_build:
-        name: Build and push PostHog
+        name: Build and push PostHog OSS
         if: github.repository == 'serialexp/posthog'
         runs-on: depot-ubuntu-22.04
         permissions:
@@ -62,7 +62,6 @@ jobs:
               with:
                   username: ${{ secrets.DOCKERHUB_USER }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
-
             - name: Build and push container image
               id: build
               uses: depot/build-push-action@v1
@@ -70,8 +69,9 @@ jobs:
                   project: jrks6t6pbc
                   buildx-fallback: false # the fallback is so slow it's better to just fail
                   push: true
+                  file: ./Dockerfile.oss
                   tags: aeolun/posthog:${{ github.sha }},aeolun/posthog:latest
-                  platforms: linux/arm64,linux/amd64
+                  platforms: linux/amd64
                   build-args: COMMIT_HASH=${{ github.sha }}
 
             # - name: get deployer token
