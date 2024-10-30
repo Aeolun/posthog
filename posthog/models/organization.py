@@ -193,8 +193,8 @@ class Organization(UUIDModel):
         try:
             from ee.models.license import License
         except ImportError:
-            self.available_product_features = []
-            return []
+            self.available_product_features = ["automatic_provisioning"]
+            return self.available_product_features
 
         self.available_product_features = []
 
