@@ -192,11 +192,17 @@ class Organization(UUIDModel):
 
         try:
             from ee.models.license import License
-        except ImportError:
-            self.available_product_features = ["automatic_provisioning"]
+        except:
+            self.available_product_features = [{
+                "key": "automatic_provisioning",
+                "name": "Automatic Provisioning"
+            }]
             return self.available_product_features
 
-        self.available_product_features = []
+        self.available_product_features = [{
+            "key": "automatic_provisioning",
+            "name": "Automatic Provisioning"
+        }]
 
         # Self hosted legacy license so we just sync the license features
         # Demo gets all features
